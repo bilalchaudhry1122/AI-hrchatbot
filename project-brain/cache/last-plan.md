@@ -1,4 +1,5 @@
-# Plan: Push to AI-hrchatbot main
+# Plan: Push latest to AI-hrchatbot main (no .env)
 
-1. Commit remaining safe changes (exclude `.env`).
-2. Push `main` to remote `AI-hrchatbot` (`https://github.com/bilalchaudhry1122/AI-hrchatbot.git`).
+1. Confirm `.env` ignored / untracked.
+2. Commit app + tests + docs + project-brain (skip `tickets.json` runtime, never `.env`).
+3. Push to remote `AI-hrchatbot` branch `main` only.

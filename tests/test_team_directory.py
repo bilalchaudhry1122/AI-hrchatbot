@@ -75,6 +75,59 @@ def test_parse_department_roster_query():
     assert parse_department_roster_query("hello") is None
     assert parse_department_roster_query("who are you") is None
     assert parse_department_roster_query("I need to talk to HR") is None
+    assert parse_department_roster_query("talk to the HR team") is None
+
+
+def test_parse_own_team_roster_query_uses_my_department():
+    from app.discord.team_directory import parse_roster_query
+
+    phrases = [
+        "what is my team?",
+        "who are my team members?",
+        "tell me my team members?",
+        "show my teammates",
+        "list my department",
+        "my team",
+        "team members",
+        "who works with me",
+        "mera team kon hai",
+        "meri team members",
+    ]
+    for phrase in phrases:
+        parsed = parse_roster_query(phrase, my_department="BI")
+        assert parsed == {"department": "BI", "needDepartment": False}, phrase
+
+    unknown = parse_roster_query("what is my team?", my_department="")
+    assert unknown == {"department": "", "needDepartment": True}
+
+    # Named department wins over "my".
+    assert parse_roster_query("who is in my marketing team", my_department="BI") == {
+        "department": "Marketing",
+        "needDepartment": False,
+    }
+    assert parse_department_roster_query("what is my team?", my_department="CS") == "CS"
+    assert parse_department_roster_query("what is my team?", my_department="") is None
+
+
+def test_resolve_my_department_from_roles_and_employee():
+    from app.discord.team_directory import resolve_my_department
+    from tests.test_hr import make_hr
+
+    assert (
+        resolve_my_department(identity={"memberRoleNames": ["BI Member", "@everyone"]})
+        == "BI"
+    )
+    assert (
+        resolve_my_department(identity={"memberRoleNames": ["Marketing HOD"]})
+        == "Marketing"
+    )
+
+    hr = make_hr()
+    for row in hr.client.table("employees").records:
+        if row["id"] == "recEmp1":
+            row["fields"]["Department"] = "Sales"
+    assert resolve_my_department(hr=hr, discord_user_id="111") == "Sales"
+    assert resolve_my_department(hr=hr, discord_user_id="999999") == ""
 
 
 def test_post_team_directory_skips_without_hr():

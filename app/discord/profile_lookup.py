@@ -470,7 +470,14 @@ class ProfileDeleteConfirmView(discord.ui.View):
 
 
 async def _execute_profile_delete(interaction, bot, employee):
-    """Wipe MySQL rows, then kick from the guild. Returns a status message."""
+    """Wipe MySQL rows, restore onboarding access, then kick. Returns a status message."""
+    from app.discord.onboarding import (
+        _clear_draft,
+        restore_onboarding_access,
+        strip_roles_after_profile_delete,
+    )
+    from app.records.employee_photos import resolve_photo_path
+
     name = employee.get("name") or "Unknown"
     discord_id = str(employee.get("discordUserId") or "").strip()
     if discord_id and discord_id == str(interaction.user.id):
@@ -490,7 +497,20 @@ async def _execute_profile_delete(interaction, bot, employee):
     if not summary:
         return f"Could not delete **{name}** — record missing."
 
+    # Drop the onboarding photo file (MySQL only stored the path).
+    root = (getattr(bot, "config", None) or {}).get("rootDir")
+    photo = resolve_photo_path(root, employee.get("photoPath"))
+    if photo is not None:
+        try:
+            photo.unlink()
+        except OSError as error:
+            bot.logger.warn("Could not delete employee photo file", {"message": str(error)[:200]})
+
+    if discord_id:
+        _clear_draft(bot, discord_id)
+
     kick_note = "Member was not in this server (DB still cleared)."
+    onboard_note = "Onboarding will be required if they join again."
     guild = interaction.guild
     if guild is not None and discord_id.isdigit():
         member = guild.get_member(int(discord_id))
@@ -503,22 +523,40 @@ async def _execute_profile_delete(interaction, bot, employee):
                 bot.logger.warn("Could not fetch member to kick", {"message": str(error)[:200]})
                 member = None
         if member is not None:
+            removed = await strip_roles_after_profile_delete(
+                member,
+                reason=f"HR deleted profile ({interaction.user})",
+            )
+            await restore_onboarding_access(
+                bot,
+                member,
+                reason=f"HR deleted profile ({interaction.user})",
+            )
+            if removed:
+                onboard_note = (
+                    "Workplace roles removed and #onboarding restored — "
+                    "they must onboard again (also if they rejoin)."
+                )
             try:
                 await member.kick(reason=f"HR deleted profile ({interaction.user})")
                 kick_note = f"Kicked <@{discord_id}> from the server."
             except discord.Forbidden:
                 kick_note = (
                     f"DB cleared, but I could not kick <@{discord_id}> "
-                    "(missing Kick Members permission or role hierarchy)."
+                    "(missing Kick Members permission or role hierarchy). "
+                    "They must complete onboarding again in #onboarding."
                 )
             except discord.HTTPException as error:
                 bot.logger.warn("Kick failed after profile delete", {"message": str(error)[:200]})
-                kick_note = f"DB cleared, but kick failed for <@{discord_id}>."
+                kick_note = (
+                    f"DB cleared, but kick failed for <@{discord_id}>. "
+                    "They must complete onboarding again in #onboarding."
+                )
 
     return (
         f"Deleted **{name}** from the database "
         f"(requests={summary['leaveRequests']}, balances={summary['leaveBalances']}, "
-        f"utilization={summary['leaveUtilization']}).\n{kick_note}"
+        f"utilization={summary['leaveUtilization']}).\n{kick_note}\n{onboard_note}"
     )
 
 

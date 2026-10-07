@@ -169,7 +169,7 @@ def test_hr_birthday_eve_posts_to_leave_inbox_not_announcements():
     import asyncio
     from datetime import date as date_cls
     from types import SimpleNamespace
-    from unittest.mock import patch
+    from unittest.mock import AsyncMock, patch
 
     from app.discord.announcements import post_hr_birthday_eve_reminders
     from app.logger import create_logger
@@ -182,14 +182,28 @@ def test_hr_birthday_eve_posts_to_leave_inbox_not_announcements():
         async def send(self, **kwargs):
             self.sent.append(kwargs)
 
+    class FakeMember:
+        def __init__(self, mid):
+            self.id = mid
+            self.bot = False
+
+    class FakeRole:
+        def __init__(self, rid, members):
+            self.id = rid
+            self.members = members
+
     hr_inbox = FakeChannel("leave-requests")
     public = FakeChannel("announcements")
+    hr_role = FakeRole(10, [FakeMember(7001), FakeMember(7002)])
 
     class FakeGuild:
-        roles = []
+        roles = [SimpleNamespace(id=10, name="HR")]
 
         def get_channel(self, channel_id):
             return {111: public, 222: hr_inbox}.get(int(channel_id))
+
+        def get_role(self, role_id):
+            return hr_role if int(role_id) == 10 else None
 
     hr = make_hr()
     hr.client.table("employees").records[0]["fields"]["DOB"] = "1990-06-16"
@@ -200,17 +214,21 @@ def test_hr_birthday_eve_posts_to_leave_inbox_not_announcements():
         logger=create_logger("error"),
         config={
             "discord": {"tickets": {"announcementChannelId": "111", "leaveReviewChannelId": "222"}},
-            "hr": {"hrRoleId": ""},
+            "hr": {"hrRoleId": "10"},
         },
     )
+    dm = AsyncMock(return_value=True)
     with patch("app.discord.announcements._pakistan_today", return_value=date_cls(2026, 6, 15)):
-        asyncio.run(post_hr_birthday_eve_reminders(bot, FakeGuild()))
+        with patch("app.discord.notify.dm_member", dm):
+            asyncio.run(post_hr_birthday_eve_reminders(bot, FakeGuild()))
     assert public.sent == []
     assert len(hr_inbox.sent) == 1
     embed = hr_inbox.sent[0]["embed"]
     assert "Abdullah" in embed.description
     assert "03001234567" in embed.description
     assert "House 9, Lahore" in embed.description
+    assert dm.await_count == 2
+    assert {call.args[1] for call in dm.await_args_list} == {"7001", "7002"}
 
 
 def test_birthday_greeting_posts_at_11am_pakistan_time():
@@ -385,7 +403,8 @@ def test_finalize_onboarding_assigns_the_exact_server_role_names():
                 self.added.append(role.name)
 
     class FakeResponse:
-        def __init__(self):
+        def __init__(self, interaction):
+            self._interaction = interaction
             self.sent = None
             self.deferred = False
 
@@ -399,8 +418,8 @@ def test_finalize_onboarding_assigns_the_exact_server_role_names():
         async def send_message(self, content=None, **kwargs):
             self.sent = {"content": content, **kwargs}
 
-        async def edit_message(self, **kwargs):
-            self.sent = kwargs
+        async def edit_message(self, content=None, **kwargs):
+            self.sent = {"content": content, **kwargs}
 
     class FakeFollowup:
         def __init__(self, response):
@@ -413,8 +432,12 @@ def test_finalize_onboarding_assigns_the_exact_server_role_names():
         def __init__(self, guild, member):
             self.guild = guild
             self.user = member
-            self.response = FakeResponse()
+            self.message = None
+            self.response = FakeResponse(self)
             self.followup = FakeFollowup(self.response)
+
+        async def edit_original_response(self, content=None, **kwargs):
+            self.response.sent = {"content": content, **kwargs}
 
     class FakeGuild:
         def __init__(self, roles):
@@ -464,7 +487,8 @@ def test_finalize_onboarding_assigns_the_exact_server_role_names():
     interaction = FakeInteraction(guild, member)
     asyncio.run(_finalize_onboarding(interaction, bot, profile, department="Sales"))
     assert member.added == ["Sales Member", "Sales · Account Executive"]
-    assert interaction.response.sent["content"].startswith("Welcome,")
+    assert "Welcome," in interaction.response.sent["content"]
+    assert "Sales Member" in interaction.response.sent["content"]
     sales_record = next(
         item for item in hr.client.table("employees").records if item["fields"]["Discord User ID"] == "9001"
     )
@@ -608,11 +632,17 @@ def test_finalize_onboarding_posts_welcome_in_announcements():
         config={"discord": {"tickets": {"announcementChannelId": "111"}}, "hr": {}, "rootDir": None},
     )
     response = FakeResponse()
+
+    async def edit_original_response(content=None, **kwargs):
+        response.sent = {"content": content, **kwargs}
+
     interaction = SimpleNamespace(
         guild=guild,
         user=member,
+        message=None,
         response=response,
         followup=FakeFollowup(response),
+        edit_original_response=edit_original_response,
     )
     profile = {
         "full_name": "New Person",
@@ -625,6 +655,7 @@ def test_finalize_onboarding_posts_welcome_in_announcements():
     }
     asyncio.run(_finalize_onboarding(interaction, bot, profile, department="Sales"))
     assert len(channel.sent) == 1
+    assert "New teammate" in (channel.sent[0].get("content") or "")
     embed = channel.sent[0]["embed"]
     assert "<@9001>" in embed.description
     assert "Sales Member" in embed.description
@@ -978,10 +1009,21 @@ def test_hr_with_role_synced_row_can_still_onboard_and_gets_leave():
             del role, reason
 
     class FakeResponse:
-        edited = None
+        sent = None
+        deferred = False
+
+        def is_done(self):
+            return self.deferred or self.sent is not None
+
+        async def defer(self, ephemeral=False):
+            del ephemeral
+            self.deferred = True
 
         async def edit_message(self, **kwargs):
-            self.edited = kwargs
+            self.sent = kwargs
+
+        async def send_message(self, content=None, **kwargs):
+            self.sent = {"content": content, **kwargs}
 
     hr = make_hr()
     upsert_staff_employee(
@@ -989,10 +1031,24 @@ def test_hr_with_role_synced_row_can_still_onboard_and_gets_leave():
     )
     assert not completed_onboarding(lookup_employee_by_discord_id(hr.client, "9100"))
 
+    response = FakeResponse()
+
+    async def edit_original_response(content=None, **kwargs):
+        response.sent = {"content": content, **kwargs}
+
     interaction = SimpleNamespace(
-        guild=SimpleNamespace(roles=[hr_role]), user=FakeMember(), response=FakeResponse()
+        guild=SimpleNamespace(roles=[hr_role], text_channels=[], me=None),
+        user=FakeMember(),
+        message=None,
+        response=response,
+        followup=SimpleNamespace(send=edit_original_response),
+        edit_original_response=edit_original_response,
     )
-    bot = SimpleNamespace(hr=hr, logger=create_logger("error"), config={})
+    bot = SimpleNamespace(
+        hr=hr,
+        logger=create_logger("error"),
+        config={"discord": {"tickets": {}}, "hr": {}},
+    )
     profile = {
         "full_name": "HR Person",
         "cnic": "12345-1234567-9",
@@ -1001,7 +1057,7 @@ def test_hr_with_role_synced_row_can_still_onboard_and_gets_leave():
         "address": "1 Office Road",
         "email": "hr.person@example.com",
     }
-    asyncio.run(_finalize_onboarding(interaction, bot, profile, department="HR", level="HR"))
+    asyncio.run(_finalize_onboarding(interaction, bot, profile, department="HR"))
 
     employee = lookup_employee_by_discord_id(hr.client, "9100")
     assert completed_onboarding(employee)
@@ -1013,3 +1069,186 @@ def test_hr_with_role_synced_row_can_still_onboard_and_gets_leave():
         row for row in hr.client.table("leaveBalances").records if row["fields"].get("Employee") == [record["id"]]
     ]
     assert len(balances) == 3
+
+
+def test_roles_to_strip_after_profile_delete_keeps_hr_admin():
+    from types import SimpleNamespace
+
+    from app.discord.onboarding import roles_to_strip_after_profile_delete
+
+    member = SimpleNamespace(
+        roles=[
+            SimpleNamespace(name="@everyone"),
+            SimpleNamespace(name="BI Member"),
+            SimpleNamespace(name="BI · Analyst"),
+            SimpleNamespace(name="HR"),
+            SimpleNamespace(name="Admin"),
+        ]
+    )
+    stripped = [role.name for role in roles_to_strip_after_profile_delete(member)]
+    assert stripped == ["BI Member", "BI · Analyst"]
+
+
+def test_restore_onboarding_access_clears_member_overwrite():
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.discord.onboarding import restore_onboarding_access
+
+    calls = []
+
+    class FakeChannel:
+        id = 55
+
+        async def set_permissions(self, target, **kwargs):
+            calls.append((target.id, kwargs))
+
+    member = SimpleNamespace(id=111, bot=False, guild=SimpleNamespace())
+    channel = FakeChannel()
+    member.guild.get_channel = lambda _cid: channel
+    bot = SimpleNamespace(config={"discord": {"tickets": {"onboardingChannelId": "55"}}}, logger=None)
+
+    asyncio.run(restore_onboarding_access(bot, member))
+    assert calls == [(111, {"overwrite": None, "reason": "Profile deleted — onboarding required again"})]
+
+
+def test_ensure_new_joiner_sees_onboarding_when_profile_missing():
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.discord.onboarding import ensure_new_joiner_sees_onboarding
+    from tests.test_hr import make_hr
+
+    calls = []
+
+    class FakeChannel:
+        async def set_permissions(self, target, **kwargs):
+            calls.append(kwargs)
+
+    member = SimpleNamespace(id=4242, bot=False, guild=SimpleNamespace())
+    channel = FakeChannel()
+    member.guild.get_channel = lambda _cid: channel
+    bot = SimpleNamespace(
+        hr=make_hr(),
+        logger=None,
+        config={"discord": {"tickets": {"onboardingChannelId": "55"}}},
+    )
+    asyncio.run(ensure_new_joiner_sees_onboarding(bot, member))
+    assert calls and calls[0].get("overwrite") is None
+
+
+def test_ensure_new_joiner_skips_when_already_onboarded():
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.discord.onboarding import ensure_new_joiner_sees_onboarding
+    from tests.test_hr import make_hr
+
+    calls = []
+
+    class FakeChannel:
+        async def set_permissions(self, target, **kwargs):
+            calls.append(kwargs)
+
+    hr = make_hr()
+    # completed_onboarding requires CNIC or DOB — bare sync rows must still see #onboarding.
+    for row in hr.client.table("employees").records:
+        if row["id"] == "recEmp1":
+            row["fields"]["CNIC"] = "12345-1234567-1"
+            row["fields"]["DOB"] = "1990-01-01"
+    member = SimpleNamespace(id=111, bot=False, guild=SimpleNamespace())
+    channel = FakeChannel()
+    member.guild.get_channel = lambda _cid: channel
+    bot = SimpleNamespace(
+        hr=hr,
+        logger=None,
+        config={"discord": {"tickets": {"onboardingChannelId": "55"}}},
+    )
+    asyncio.run(ensure_new_joiner_sees_onboarding(bot, member))
+    assert calls == []
+
+
+def test_execute_profile_delete_restores_onboarding_and_wipes_disk_photo(tmp_path):
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.discord.profile_lookup import _execute_profile_delete
+    from app.records.employees import lookup_employee_by_discord_id, record_to_employee
+    from tests.test_hr import make_hr
+
+    hr = make_hr()
+    employee = record_to_employee(
+        next(item for item in hr.client.table("employees").records if item["id"] == "recEmp1")
+    )
+    photo = tmp_path / "employees" / "photos" / "111.jpg"
+    photo.parent.mkdir(parents=True)
+    photo.write_bytes(b"fake-photo")
+    employee["photoPath"] = "employees/photos/111.jpg"
+
+    removed_roles = []
+    permission_calls = []
+    kicked = []
+    designation = "BI" + " \u00b7 " + "Analyst"
+
+    class FakeRole:
+        def __init__(self, name):
+            self.name = name
+
+    class FakeMember:
+        id = 111
+        bot = False
+        roles = [FakeRole("@everyone"), FakeRole("BI Member"), FakeRole(designation), FakeRole("HR")]
+
+        async def remove_roles(self, *roles, reason=None):
+            removed_roles.extend(role.name for role in roles)
+            self.roles = [role for role in self.roles if role not in roles]
+
+        async def kick(self, reason=None):
+            kicked.append(reason)
+
+    class FakeChannel:
+        async def set_permissions(self, target, **kwargs):
+            permission_calls.append(kwargs)
+
+    guild = SimpleNamespace()
+    member = FakeMember()
+    channel = FakeChannel()
+    guild.get_member = lambda _uid: member
+    guild.get_channel = lambda _cid: channel
+    member.guild = guild
+
+    class FakeLogger:
+        def info(self, *a, **k):
+            pass
+
+        def warn(self, *a, **k):
+            pass
+
+        def error(self, *a, **k):
+            pass
+
+    bot = SimpleNamespace(
+        hr=hr,
+        logger=FakeLogger(),
+        config={
+            "rootDir": str(tmp_path),
+            "discord": {"tickets": {"onboardingChannelId": "55"}},
+        },
+        _onboarding_drafts={"111": {"full_name": "Abdullah"}},
+    )
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=999, __str__=lambda self: "HR#1"),
+        guild=guild,
+    )
+
+    message = asyncio.run(_execute_profile_delete(interaction, bot, employee))
+    assert "Deleted" in message
+    assert kicked
+    assert "BI Member" in removed_roles
+    assert designation in removed_roles
+    assert "HR" not in removed_roles
+    assert permission_calls and permission_calls[0].get("overwrite") is None
+    assert not photo.exists()
+    assert "111" not in bot._onboarding_drafts
+    assert all(item["id"] != "recEmp1" for item in hr.client.table("employees").records)
+    assert lookup_employee_by_discord_id(hr.client, "111") is None

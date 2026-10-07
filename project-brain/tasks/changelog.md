@@ -1,3 +1,5 @@
+- 2026-10-07: Fine-tuned roster asks — my team / teammates use asker department; named dept asks still work.
+- 2026-10-07: `/deleteprofile` wipes DB/photo/draft, strips workplace roles, restores `#onboarding`; rejoin requires onboarding again.
 - 2026-10-07: Fixed onboarding welcome (resolve/persist `#announcements`) and photo step (defer before download/save).
 - 2026-10-07: Ticket greeting no longer lists employees; asking who is in BI/CS/Marketing/HR posts that department roster with photos.
 - 2026-10-07: Reverted local commit `63963b2` (mixed reset); remote `current-flow` already deleted.

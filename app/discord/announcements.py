@@ -83,6 +83,23 @@ def _remember_announcement_channel(bot, channel):
             logger.warn("Could not persist announcement channel id", {"message": str(error)[:200]})
 
 
+def _find_announcements_channel(guild):
+    """Match #announcements whether it is a text or Discord Announcement channel."""
+    if guild is None:
+        return None
+    wanted = ANNOUNCEMENT_CHANNEL_NAME
+    for item in list(getattr(guild, "text_channels", None) or []):
+        if str(item.name or "").strip().lower() == wanted:
+            return item
+    for item in list(getattr(guild, "channels", None) or []):
+        name = str(getattr(item, "name", "") or "").strip().lower()
+        if name != wanted:
+            continue
+        if isinstance(item, discord.TextChannel):
+            return item
+    return None
+
+
 async def ensure_announcement_channel(bot, guild):
     """Find or create #announcements. Everyone reads; HR/Admin/bot can post."""
     configured = _config_channel_id(bot.config)
@@ -95,10 +112,7 @@ async def ensure_announcement_channel(bot, guild):
             except discord.HTTPException:
                 channel = None
     if channel is None:
-        for item in guild.text_channels:
-            if str(item.name or "").strip().lower() == ANNOUNCEMENT_CHANNEL_NAME:
-                channel = item
-                break
+        channel = _find_announcements_channel(guild)
     overwrites = _announcement_overwrites(guild, bot.config)
     topic = "Company announcements and birthday greetings. HR can post here."
     try:
@@ -111,7 +125,11 @@ async def ensure_announcement_channel(bot, guild):
             )
             bot.logger.info("Created announcements channel", {"channel": str(channel.id)})
         else:
-            await channel.edit(overwrites=overwrites, topic=topic)
+            try:
+                await channel.edit(overwrites=overwrites, topic=topic)
+            except discord.HTTPException as error:
+                # Still usable for posting even if permission sync failed.
+                bot.logger.warn("Could not refresh announcements channel overwrites", {"message": str(error)})
     except discord.HTTPException as error:
         bot.logger.warn("Could not prepare announcements channel", {"message": str(error)})
     # Always remember a found/created channel, even when overwrite edit fails.
@@ -141,29 +159,45 @@ def welcome_onboard_embed(profile, *, discord_user_id, role_name):
 async def post_onboard_welcome(bot, guild, *, profile, discord_user_id, role_name):
     """Post a welcome in #announcements. Never raise — onboarding already succeeded."""
     if bot is None or guild is None:
-        return
+        return False
     logger = getattr(bot, "logger", None)
     try:
         channel = await ensure_announcement_channel(bot, guild)
     except Exception as error:
         if logger:
             logger.warn("Could not resolve announcements channel for welcome", {"message": str(error)[:200]})
-        return
+        return False
     if channel is None:
         if logger:
             logger.warn("Onboarding welcome skipped — no #announcements channel")
-        return
+        return False
+    mention = f"<@{discord_user_id}>" if str(discord_user_id or "").isdigit() else ""
+    name = (profile or {}).get("full_name") or "a teammate"
+    content = f"👋 New teammate: {mention or name}"
     try:
         await channel.send(
+            content=content,
             embed=welcome_onboard_embed(
                 profile,
                 discord_user_id=discord_user_id,
                 role_name=role_name,
-            )
+            ),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
+        if logger:
+            logger.info("Posted onboarding welcome", {
+                "channel": str(channel.id),
+                "user": str(discord_user_id or ""),
+                "name": name,
+            })
+        return True
     except discord.HTTPException as error:
         if logger:
-            logger.warn("Could not post onboarding welcome", {"message": str(error)})
+            logger.warn("Could not post onboarding welcome", {
+                "channel": str(getattr(channel, "id", "")),
+                "message": str(error),
+            })
+        return False
 
 
 def birthday_embed(employee):
@@ -225,14 +259,36 @@ def _pakistan_today():
     return datetime.datetime.now(PAKISTAN_TZ).date()
 
 
+def _hr_member_ids(guild, config):
+    """Discord user ids for everyone holding the HR (or Admin fallback) role."""
+    roles = [{"id": str(role.id), "name": role.name} for role in getattr(guild, "roles", []) or []]
+    tickets = ((config or {}).get("discord") or {}).get("tickets") or {}
+    hr_cfg = (config or {}).get("hr") or {}
+    hr_id = str(hr_cfg.get("hrRoleId") or find_hr_role_id(roles, "") or "").strip()
+    if not hr_id.isdigit() and tickets.get("adminRoleId"):
+        hr_id = str(tickets.get("adminRoleId") or "").strip()
+    if not hr_id.isdigit():
+        return []
+    role = guild.get_role(int(hr_id)) if hasattr(guild, "get_role") else None
+    if role is None:
+        return []
+    out = []
+    for member in list(getattr(role, "members", None) or []):
+        if getattr(member, "bot", False):
+            continue
+        mid = str(getattr(member, "id", "") or "").strip()
+        if mid.isdigit():
+            out.append(mid)
+    return out
+
+
 async def post_todays_birthdays(bot, guild):
-    if bot.hr is None or bot.hr.client is None:
+    """Public Happy Birthday posts in #announcements (Pakistan calendar day)."""
+    if bot.hr is None or bot.hr.client is None or guild is None:
         return
-    channel_id = _config_channel_id(bot.config)
-    if not channel_id.isdigit():
-        return
-    channel = guild.get_channel(int(channel_id))
+    channel = await ensure_announcement_channel(bot, guild)
     if channel is None:
+        bot.logger.warn("Birthday greetings skipped — no #announcements channel")
         return
     import asyncio
 
@@ -243,19 +299,18 @@ async def post_todays_birthdays(bot, guild):
     for person in people:
         try:
             await channel.send(embed=birthday_embed(person))
+            bot.logger.info("Posted birthday greeting", {
+                "channel": str(channel.id),
+                "user": str(person.get("discordUserId") or ""),
+                "name": str(person.get("name") or ""),
+            })
         except discord.HTTPException as error:
             bot.logger.warn("Could not post birthday greeting", {"message": str(error)})
 
 
 async def post_hr_birthday_eve_reminders(bot, guild):
-    """Day-before cake notice in #leave-requests (HR inbox only)."""
+    """Day-before cake notice: #leave-requests plus a DM to each HR member."""
     if bot.hr is None or bot.hr.client is None or guild is None:
-        return
-    channel_id = str(leave_review_channel_id(bot.config) or "").strip()
-    if not channel_id.isdigit():
-        return
-    channel = guild.get_channel(int(channel_id)) if hasattr(guild, "get_channel") else None
-    if channel is None:
         return
     import asyncio
 
@@ -264,16 +319,42 @@ async def post_hr_birthday_eve_reminders(bot, guild):
     people = await asyncio.to_thread(
         list_birthdays_today, bot.hr.client, today=tomorrow, logger=bot.logger
     )
+    if not people:
+        return
+
+    channel_id = str(leave_review_channel_id(bot.config) or "").strip()
+    channel = guild.get_channel(int(channel_id)) if channel_id.isdigit() and hasattr(guild, "get_channel") else None
     ping = _hr_role_mention(guild, bot.config)
-    content = f"{ping} Birthday tomorrow — please send a cake." if ping else None
+    content = f"{ping} Birthday tomorrow — please send a cake." if ping else "Birthday tomorrow — please send a cake."
+    hr_ids = _hr_member_ids(guild, bot.config)
+
+    from app.discord.notify import dm_member
+
     for person in people:
-        try:
-            await channel.send(
-                content=content,
-                embed=hr_birthday_cake_embed(person, birthday_date=tomorrow),
+        embed = hr_birthday_cake_embed(person, birthday_date=tomorrow)
+        if channel is not None:
+            try:
+                await channel.send(content=content, embed=embed)
+            except discord.HTTPException as error:
+                bot.logger.warn("Could not post HR birthday cake reminder", {"message": str(error)})
+        dm_ok = 0
+        for hr_id in hr_ids:
+            sent = await dm_member(
+                bot,
+                hr_id,
+                content="Birthday tomorrow — please send a cake.",
+                embed=embed,
+                guild=guild,
             )
-        except discord.HTTPException as error:
-            bot.logger.warn("Could not post HR birthday cake reminder", {"message": str(error)})
+            if sent:
+                dm_ok += 1
+        bot.logger.info("HR birthday eve reminder", {
+            "name": str(person.get("name") or ""),
+            "birthday": tomorrow.isoformat(),
+            "inbox": bool(channel is not None),
+            "hrDms": dm_ok,
+            "hrCandidates": len(hr_ids),
+        })
 
 
 def start_birthday_task(bot):

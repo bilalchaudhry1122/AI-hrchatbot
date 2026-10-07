@@ -131,7 +131,7 @@ Useful commands / actions:
 
 - **`/profile`** with a name or ID — look someone up (photo shows when the file is stored)
 - **Edit profile** — update name, contact, CNIC, email, date of birth, address, **designation**
-- **`/deleteprofile`** — remove their employee record (confirmation required; they may also be removed from the server)
+- **`/deleteprofile`** — wipe their DB record (and leave rows), remove photo, strip workplace roles, restore `#onboarding`, then kick (confirmation required). If they join again, onboarding is required.
 
 Use this when onboarding data is wrong, a photo or title needs updating, or someone leaves the company.
 

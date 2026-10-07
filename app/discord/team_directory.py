@@ -4,9 +4,13 @@ import re
 
 import discord
 
-from app.hr.departments import normalize_department
+from app.hr.departments import (
+    department_from_role_names,
+    hod_department_from_role_names,
+    normalize_department,
+)
 from app.records.employee_photos import resolve_photo_path
-from app.records.employees import list_employees
+from app.records.employees import list_employees, lookup_employee_by_discord_id
 
 DIRECTORY_BATCH = 8
 DIRECTORY_COLOR = 0x0F766E
@@ -27,9 +31,36 @@ _ROSTER_ASK = re.compile(
     r"\b("
     r"who(?:'s|s| is| are)?|"
     r"people|members?|team|staff|names?|"
-    r"list|show|tell|"
+    r"list|show|tell|display|"
     r"kon|kaun"
     r")\b",
+    re.I,
+)
+# Own department (no named BI/CS/…): "my team", "team members", "mera team", …
+_OWN_TEAM_ASK = re.compile(
+    r"(?:"
+    r"\b(?:what(?:'s| is)|who(?:'s|s| is| are)|show|list|tell(?:\s+me)?|display|share|give)\b"
+    r".{0,48}\b(?:my|our|mera|meri|hamara|hamari)\s+"
+    r"(?:team|teammates?|department|dept)(?:\s+members?)?\b"
+    r"|"
+    r"\b(?:my|our|mera|meri|hamara|hamari)\s+"
+    r"(?:team|teammates?|department|dept)(?:\s+members?)?\b"
+    r"|"
+    r"\b(?:team|department)\s+members?\b"
+    r"|"
+    r"\bteammates?\b"
+    r"|"
+    r"\bwho\s+works?\s+with\s+me\b"
+    r"|"
+    r"\b(?:kon|kaun)\s+kon\b.{0,40}\b(?:mera|meri|hamara|hamari)\s+team\b"
+    r"|"
+    r"\b(?:mera|meri)\s+team\s+(?:kon|kaun|members?|log)\b"
+    r")",
+    re.I,
+)
+_HANDOFF_HR = re.compile(
+    r"\b(talk|speak|contact|call|ping|bring|baat|bulao|connect)\b.{0,40}\bhr\b"
+    r"|\bhr\b.{0,40}\b(talk|speak|baat|bulao)\b",
     re.I,
 )
 _BOT_IDENTITY = re.compile(
@@ -38,23 +69,103 @@ _BOT_IDENTITY = re.compile(
 )
 
 
-def parse_department_roster_query(question):
-    """Return BI/CS/Marketing/Sales/HR when the user asks who is in that team."""
+def _named_department(text):
+    for alias, key in _ALIAS_TO_DEPT:
+        if re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", text):
+            return key if key in _ROSTER_DEPARTMENTS else ""
+    return ""
+
+
+def resolve_my_department(*, identity=None, hr=None, discord_user_id="", logger=None):
+    """Best-effort department for 'my team' from Discord roles, then employee row."""
+    roles = list((identity or {}).get("memberRoleNames") or [])
+    dept = hod_department_from_role_names(roles) or department_from_role_names(roles)
+    if dept in _ROSTER_DEPARTMENTS:
+        return dept
+    if dept:
+        raw = normalize_department(dept) or str(dept).strip()
+        if raw in _ROSTER_DEPARTMENTS:
+            return raw
+    if hr is None or getattr(hr, "client", None) is None or not str(discord_user_id or "").strip():
+        return ""
+    try:
+        person = lookup_employee_by_discord_id(
+            hr.client,
+            str(discord_user_id),
+            logger=logger,
+        )
+    except Exception:
+        person = None
+    if not person:
+        return ""
+    stored = normalize_department(person.get("department")) or str(person.get("department") or "").strip()
+    return stored if stored in _ROSTER_DEPARTMENTS else ""
+
+
+def parse_roster_query(question, *, my_department=""):
+    """Detect a team-directory ask.
+
+    Returns None when not a roster question, otherwise:
+      {"department": "BI"|"CS"|...} when resolved
+      {"department": "", "needDepartment": True} for own-team with unknown dept
+    """
     text = " ".join(str(question or "").strip().lower().split())
     if not text or len(text) > 200:
         return None
     if _BOT_IDENTITY.search(text):
         return None
-    found = ""
-    for alias, key in _ALIAS_TO_DEPT:
-        if re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", text):
-            found = key
-            break
-    if not found:
+    if _HANDOFF_HR.search(text):
         return None
-    if not _ROSTER_ASK.search(text):
+
+    named = _named_department(text)
+    own = bool(_OWN_TEAM_ASK.search(text))
+
+    if named and (_ROSTER_ASK.search(text) or own):
+        return {"department": named, "needDepartment": False}
+
+    if own:
+        mine = str(my_department or "").strip()
+        if mine in _ROSTER_DEPARTMENTS:
+            return {"department": mine, "needDepartment": False}
+        return {"department": "", "needDepartment": True}
+
+    return None
+
+
+def parse_department_roster_query(question, *, my_department=""):
+    """Return BI/CS/Marketing/Sales/HR when the roster department is known."""
+    parsed = parse_roster_query(question, my_department=my_department)
+    if not parsed or parsed.get("needDepartment"):
         return None
-    return found if found in _ROSTER_DEPARTMENTS else None
+    return parsed.get("department") or None
+
+
+def roster_need_department_reply(question=""):
+    """Ask the user to name a department when we cannot infer theirs."""
+    from app.routing.language import detect_reply_language, pick_locale_text
+
+    return pick_locale_text(
+        detect_reply_language(question),
+        english=(
+            "I can show your department team — tell me which one: "
+            "**BI**, **CS**, **Marketing**, **Sales**, or **HR**. "
+            "Example: who is in BI?"
+        ),
+        roman=(
+            "Main aapki department team dikha sakta hoon — kaunsi? "
+            "**BI**, **CS**, **Marketing**, **Sales**, ya **HR**. "
+            "Example: who is in BI?"
+        ),
+        urdu=(
+            "میں آپ کی ڈیپارٹمنٹ ٹیم دکھا سکتا ہوں — کون سی؟ "
+            "**BI**، **CS**، **Marketing**، **Sales**، یا **HR**۔ "
+            "مثال: who is in BI?"
+        ),
+        mix=(
+            "Main aapki department team dikha sakta hoon — BI, CS, Marketing, Sales, ya HR? "
+            "Example: who is in BI?"
+        ),
+    )
 
 
 def active_directory_people(employees, department=None):

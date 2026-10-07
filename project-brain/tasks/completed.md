@@ -1,6 +1,20 @@
 # Completed
 
 ---
+Task: Fine-tune my-team / department roster asks
+Date: 2026-10-07
+Type: feature
+Files Changed: app/discord/team_directory.py, app/agent/router.py, app/routing/scope.py, app/discord/bot.py, tests/test_team_directory.py
+Modules Changed: discord_team_directory, agent_router
+Summary: Own-team phrases resolve asker department; named BI/CS/Marketing/Sales/HR asks unchanged; clarify when dept unknown.
+---
+Task: Delete profile forces re-onboarding
+Date: 2026-10-07
+Type: feature
+Files Changed: app/discord/onboarding.py, app/discord/profile_lookup.py, app/discord/bot.py, tests/test_onboarding_overhaul.py
+Modules Changed: discord_onboarding, discord_profile_lookup
+Summary: `/deleteprofile` wipes DB/photo/draft, strips workplace roles, clears `#onboarding` deny, kicks; join restores onboarding if profile incomplete.
+---
 Task: Fix onboarding welcome + photo
 Date: 2026-10-07
 Type: bugfix

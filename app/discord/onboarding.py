@@ -124,18 +124,19 @@ def _onboarding_overwrites(guild, config):
     return overwrites
 
 
+def _onboarding_text_channel(bot, guild):
+    config = getattr(bot, "config", None) or {}
+    channel_id = _config_channel_id(config)
+    if not channel_id.isdigit() or guild is None:
+        return None
+    return guild.get_channel(int(channel_id))
+
+
 async def hide_onboarding_for_member(bot, member):
     """After onboarding, hide #onboarding from that person (member overwrite)."""
     if member is None or getattr(member, "bot", False):
         return
-    config = getattr(bot, "config", None) or {}
-    channel_id = _config_channel_id(config)
-    if not channel_id.isdigit():
-        return
-    guild = getattr(member, "guild", None)
-    if guild is None:
-        return
-    channel = guild.get_channel(int(channel_id))
+    channel = _onboarding_text_channel(bot, getattr(member, "guild", None))
     if channel is None:
         return
     try:
@@ -151,6 +152,74 @@ async def hide_onboarding_for_member(bot, member):
                 "user": str(getattr(member, "id", "")),
                 "message": str(error)[:200],
             })
+
+
+async def restore_onboarding_access(bot, member, *, reason="Profile deleted — onboarding required again"):
+    """Clear a member deny so they can see #onboarding again (e.g. after delete/rejoin)."""
+    if member is None or getattr(member, "bot", False):
+        return
+    channel = _onboarding_text_channel(bot, getattr(member, "guild", None))
+    if channel is None:
+        return
+    try:
+        await channel.set_permissions(member, overwrite=None, reason=reason)
+    except discord.HTTPException as error:
+        logger = getattr(bot, "logger", None)
+        if logger:
+            logger.warn("Could not restore onboarding channel access", {
+                "user": str(getattr(member, "id", "")),
+                "message": str(error)[:200],
+            })
+
+
+def roles_to_strip_after_profile_delete(member):
+    """Workplace / designation roles that must go so onboarding is visible again."""
+    keep = {"@everyone", "hr", "admin", "administrator", "admins", "staff"}
+    out = []
+    for role in list(getattr(member, "roles", []) or []):
+        name = str(getattr(role, "name", "") or "").strip()
+        lowered = name.lower()
+        if not name or lowered in keep:
+            continue
+        if _is_onboarded_workplace_role(name) or " · " in name or " ·" in name:
+            out.append(role)
+    return out
+
+
+async def strip_roles_after_profile_delete(member, *, reason="HR deleted profile"):
+    """Remove department/designation roles so #onboarding is not role-hidden."""
+    to_remove = roles_to_strip_after_profile_delete(member)
+    if not to_remove:
+        return []
+    try:
+        await member.remove_roles(*to_remove, reason=reason)
+        return [getattr(role, "name", "") for role in to_remove]
+    except discord.HTTPException:
+        return []
+
+
+async def ensure_new_joiner_sees_onboarding(bot, member):
+    """After join: if they have no completed profile, make #onboarding visible."""
+    if member is None or getattr(member, "bot", False):
+        return
+    existing = None
+    if getattr(bot, "hr", None) is not None and bot.hr.client is not None:
+        try:
+            existing = await asyncio.to_thread(
+                lookup_employee_by_discord_id,
+                bot.hr.client,
+                str(member.id),
+                logger=getattr(bot, "logger", None),
+            )
+        except Exception:
+            existing = None
+    if completed_onboarding(existing):
+        return
+    await restore_onboarding_access(
+        bot,
+        member,
+        reason="New join / no completed profile — onboarding required",
+    )
 
 
 async def ensure_onboarding_channel(bot, guild):
@@ -447,10 +516,10 @@ class OnboardingModalTwo(discord.ui.Modal, title="Onboarding — Step 2 of 2"):
                 ephemeral=True,
             )
             return
-        await interaction.response.send_message(
-            "Almost done — pick your department, then type your designation:",
+        await _replace_step(
+            interaction,
+            content="Almost done — pick your department, then type your designation:",
             view=DepartmentSelectView(self.bot, profile),
-            ephemeral=True,
         )
 
 
@@ -505,10 +574,10 @@ class DesignationModal(discord.ui.Modal, title="Your designation"):
             )
             return
         _save_draft(self.bot, interaction.user.id, {**profile, "department": self.department})
-        await interaction.response.send_message(
-            "Last step — add a profile photo (JPG, PNG, or WebP), or skip.",
+        await _replace_step(
+            interaction,
+            content="Last step — add a profile photo (JPG, PNG, or WebP), or skip.",
             view=PhotoStepView(self.bot, profile, self.department),
-            ephemeral=True,
         )
 
 
@@ -539,6 +608,7 @@ class PhotoStepView(discord.ui.View):
         del button
         if not interaction.response.is_done():
             await interaction.response.defer(ephemeral=True)
+        self.stop()
         await _finalize_onboarding(interaction, self.bot, self.profile, department=self.department)
 
 
@@ -644,6 +714,43 @@ async def _onboard_reply(interaction, *, content, view=None):
     await interaction.response.send_message(content=content, view=view, ephemeral=True)
 
 
+async def _replace_step(interaction, *, content, view=None):
+    """Update the current ephemeral step in place (no stacked leftover buttons)."""
+    if not interaction.response.is_done():
+        if getattr(interaction, "message", None) is not None:
+            try:
+                await interaction.response.edit_message(content=content, view=view)
+                return
+            except discord.HTTPException:
+                pass
+        await interaction.response.send_message(content=content, view=view, ephemeral=True)
+        return
+    try:
+        await interaction.edit_original_response(content=content, view=view)
+        return
+    except discord.HTTPException:
+        pass
+    msg = getattr(interaction, "message", None)
+    if msg is not None:
+        try:
+            await msg.edit(content=content, view=view)
+            return
+        except discord.HTTPException:
+            pass
+    await interaction.followup.send(content=content, view=view, ephemeral=True)
+
+
+async def _clear_opener_message(interaction, *, content):
+    """After a modal finishes, strip buttons from the message that opened the modal."""
+    msg = getattr(interaction, "message", None)
+    if msg is None:
+        return
+    try:
+        await msg.edit(content=content, view=None)
+    except discord.HTTPException:
+        pass
+
+
 async def _finalize_onboarding(interaction, bot, profile, *, department):
     if not interaction.response.is_done():
         await interaction.response.defer(ephemeral=True)
@@ -660,7 +767,7 @@ async def _finalize_onboarding(interaction, bot, profile, *, department):
             "roleName": role_name,
         })
         _save_draft(bot, member.id, profile)
-        await _onboard_reply(
+        await _replace_step(
             interaction,
             content=(
                 f"Setup is incomplete: the **{role_name}** role does not exist on this server yet. "
@@ -680,7 +787,7 @@ async def _finalize_onboarding(interaction, bot, profile, *, department):
     except discord.HTTPException as error:
         bot.logger.error("Could not assign onboarding role", {"message": str(error), "role": role_name})
         _save_draft(bot, member.id, profile)
-        await _onboard_reply(
+        await _replace_step(
             interaction,
             content=(
                 "Could not assign your Discord role. Your details are saved — "
@@ -718,7 +825,7 @@ async def _finalize_onboarding(interaction, bot, profile, *, department):
     except Exception as error:
         bot.logger.error("Onboarding employee record failed", {"message": str(error)[:300]})
         _save_draft(bot, member.id, profile)
-        await _onboard_reply(
+        await _replace_step(
             interaction,
             content=(
                 "Your role was assigned but your profile could not be saved. "
@@ -728,18 +835,29 @@ async def _finalize_onboarding(interaction, bot, profile, *, department):
         )
         return
     _clear_draft(bot, member.id)
+    # Announce in #announcements first — do not let ephemeral UI cleanup skip it.
+    try:
+        await post_onboard_welcome(
+            bot,
+            guild,
+            profile=profile,
+            discord_user_id=str(member.id),
+            role_name=role_name,
+        )
+    except Exception as error:
+        bot.logger.error("Onboarding welcome announcement failed", {"message": str(error)[:300]})
     if level != "HR":
-        await hide_onboarding_for_member(bot, member)
+        try:
+            await hide_onboarding_for_member(bot, member)
+        except Exception as error:
+            bot.logger.warn("Could not hide onboarding after join", {"message": str(error)[:200]})
     title_bit = f" — **{designation}**" if designation else ""
-    await _onboard_reply(
-        interaction,
-        content=f"Welcome, {profile['full_name']}! You're onboarded as **{role_name}**{title_bit}.",
-        view=None,
+    success = (
+        f"✅ Welcome, {profile['full_name']}! You're onboarded as **{role_name}**{title_bit}.\n"
+        "You're all set — you can dismiss this message."
     )
-    await post_onboard_welcome(
-        bot,
-        guild,
-        profile=profile,
-        discord_user_id=str(member.id),
-        role_name=role_name,
-    )
+    try:
+        await _replace_step(interaction, content=success, view=None)
+        await _clear_opener_message(interaction, content=success)
+    except Exception as error:
+        bot.logger.warn("Could not close onboarding UI", {"message": str(error)[:200]})

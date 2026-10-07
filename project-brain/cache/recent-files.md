@@ -1,1 +1,5 @@
-- (ops) bot start via `python -u -m app.main`
+- app/discord/team_directory.py
+- app/agent/router.py
+- app/routing/scope.py
+- app/discord/bot.py
+- tests/test_team_directory.py

@@ -155,17 +155,35 @@ class AgentRouter:
                 "ui": "profile_privacy",
             }
 
-        from app.discord.team_directory import parse_department_roster_query
+        from app.discord.team_directory import (
+            parse_roster_query,
+            resolve_my_department,
+            roster_need_department_reply,
+        )
 
-        roster_department = parse_department_roster_query(question)
-        if roster_department and not draft.get("awaiting_details") and not draft.get("awaiting_confirm"):
-            return {
-                "answer": "",
-                "fallback": True,
-                "chunks": [],
-                "ui": "team_directory",
-                "directoryDepartment": roster_department,
-            }
+        if not draft.get("awaiting_details") and not draft.get("awaiting_confirm"):
+            my_dept = resolve_my_department(
+                identity=prompt_identity,
+                hr=self.hr,
+                discord_user_id=discord_user_id,
+                logger=self.logger,
+            )
+            roster = parse_roster_query(question, my_department=my_dept)
+            if roster:
+                if roster.get("needDepartment") or not roster.get("department"):
+                    return {
+                        "answer": roster_need_department_reply(question),
+                        "fallback": True,
+                        "chunks": [],
+                        "ui": "team_directory_clarify",
+                    }
+                return {
+                    "answer": "",
+                    "fallback": True,
+                    "chunks": [],
+                    "ui": "team_directory",
+                    "directoryDepartment": roster["department"],
+                }
 
         if is_refuse_withdraw(question):
             locale = detect_reply_language(question)

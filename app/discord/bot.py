@@ -24,7 +24,12 @@ from app.discord.leave_ui import (
 from app.discord.leave_review import LeaveReviewView, calendar_embed, queue_embed
 from app.discord.messages import split_discord_content
 from app.discord.notify import notify_decision
-from app.discord.onboarding import OnboardingStartView, ensure_onboarding_channel, ensure_onboarding_panel
+from app.discord.onboarding import (
+    OnboardingStartView,
+    ensure_new_joiner_sees_onboarding,
+    ensure_onboarding_channel,
+    ensure_onboarding_panel,
+)
 from app.discord.profile_lookup import (
     ensure_hr_profile_channel,
     run_profile_delete,
@@ -200,6 +205,7 @@ class SupportBot(discord.Client):
 
     async def on_member_join(self, member):
         await sync_staff_member(self, member, reason="join")
+        await ensure_new_joiner_sees_onboarding(self, member)
         asyncio.create_task(_sync_member_after_delay(self, member, reason="join-delayed"))
 
     async def on_guild_role_create(self, role):
@@ -741,6 +747,9 @@ async def handle_message(bot, message):
         await post_team_directory(
             bot,
             message.channel,
+            member_name=getattr(message.author, "display_name", None)
+            or getattr(message.author, "name", None)
+            or "",
             department=result.get("directoryDepartment") or "",
         )
         return True

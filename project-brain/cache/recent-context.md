@@ -1,3 +1,3 @@
 # Recent context
 
-Committed `0ddfa01` (channels + ticket/HR access). Push to `AI-hrchatbot` main rejected non-fast-forward; needs user OK for force-push. `.env` not committed.
+Team roster intent fine-tuned: "my team" / team members use the asker's department; named dept asks still work. Bot restarted to pick up the change.

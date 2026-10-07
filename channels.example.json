@@ -1,0 +1,29 @@
+{
+  "respondMode": "all",
+  "tickets": {
+    "enabled": true,
+    "categoryId": "PASTE_TICKET_CATEGORY_ID",
+    "adminRoleId": "PASTE_ADMIN_ROLE_ID",
+    "staffRoleId": "PASTE_STAFF_ROLE_ID",
+    "leaveReviewChannelId": "PASTE_LEAVE_REVIEW_CHANNEL_ID",
+    "hrCategoryId": "PASTE_HR_CATEGORY_ID",
+    "hodCategoryId": "PASTE_HOD_CATEGORY_ID",
+    "hodChannels": {
+      "BI": "PASTE_BI_HOD_CHANNEL_ID",
+      "CS": "PASTE_CS_HOD_CHANNEL_ID",
+      "Marketing": "PASTE_MARKETING_HOD_CHANNEL_ID"
+    },
+    "hodRoleIds": {
+      "BI": "PASTE_BI_HOD_ROLE_ID",
+      "CS": "PASTE_CS_HOD_ROLE_ID",
+      "Marketing": "PASTE_MARKETING_HOD_ROLE_ID"
+    },
+    "onboardingChannelId": "PASTE_ONBOARDING_CHANNEL_ID",
+    "announcementChannelId": "PASTE_ANNOUNCEMENT_CHANNEL_ID",
+    "hrProfileChannelId": "PASTE_HR_PROFILE_CHANNEL_ID"
+  },
+  "channels": {
+    "PASTE_DISCORD_CHANNEL_ID": "bilal",
+    "ANOTHER_CHANNEL_ID": "abdullah"
+  }
+}

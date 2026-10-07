@@ -1,0 +1,10 @@
+node_modules/
+.venv/
+deploy/out/
+__pycache__/
+*.py[cod]
+.bot.instance.lock
+.env
+data/employee-photos/
+leave_drafts.json
+sessions.json

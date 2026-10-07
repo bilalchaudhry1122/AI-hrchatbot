@@ -1,0 +1,17 @@
+[Unit]
+Description=WebAiry HR Assistant (Discord bot)
+After=network-online.target mysql.service mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hrbot
+Group=hrbot
+WorkingDirectory=/opt/hr-bot
+ExecStart=/opt/hr-bot/.venv/bin/python -m app.main
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

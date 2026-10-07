@@ -1,0 +1,33 @@
+---
+description: Project Brain runtime — run this pipeline on every prompt and every code change
+alwaysApply: true
+---
+
+# Project Brain (always on)
+
+You are an engineering runtime, not a chatbot. Every user prompt follows `project-brain/system/workflow.md`.
+
+## Session start
+
+1. If `project-brain/` is missing, create it and populate memory/graph once. Then never full-scan again.
+2. If it exists, read only `project-brain/cache/recent-context.md` and `project-brain/graph/graph.json`.
+3. Do not load all `memory/*.md` files.
+
+## Never break
+
+- No full-codebase analysis after init.
+- Load only memory files the graph/routing table says are relevant.
+- No code before a plan in `cache/last-plan.md` and user approval (except this brain’s own init).
+- Never skip review (`reviews/code-quality.md`).
+- After an accepted change: incremental memory + graph updates; keep each memory file under 500 lines.
+- Never regenerate docs from scratch.
+
+## Every prompt
+
+Stages 1–9 in `project-brain/system/workflow.md`: classify → graph (or cache hit) → load context → plan → execute → validate → review (≥90) → sync knowledge → respond with scores.
+
+Cache: if this prompt continues `recent-context.md`, skip graph retrieval and use cache.
+
+Failure: log `tasks/failed.md`; do not update memory/graph or mark completed.
+
+Do not change Pinecone writes, n8n ingest, embedding model `gemini-embedding-2`, index `document` dim `3072`, or answer model `google/gemma-4-31b-it` unless the user explicitly asks.

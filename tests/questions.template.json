@@ -1,0 +1,28 @@
+{
+  "instructions": "Copy this file per namespace and fill results while calibrating RELEVANCE_THRESHOLD.",
+  "namespace": "bilal",
+  "threshold": 0.45,
+  "groups": {
+    "known": [
+      { "question": "", "topSource": "", "score": null, "correctDocument": null, "answer": "", "grounded": null, "fallbackExpected": false }
+    ],
+    "paraphrased": [
+      { "question": "", "topSource": "", "score": null, "correctDocument": null, "answer": "", "grounded": null, "fallbackExpected": false }
+    ],
+    "partial": [
+      { "question": "", "topSource": "", "score": null, "correctDocument": null, "answer": "", "grounded": null, "fallbackExpected": false }
+    ],
+    "unrelated": [
+      { "question": "What is the capital of France?", "topSource": "", "score": null, "correctDocument": false, "answer": "", "grounded": null, "fallbackExpected": true }
+    ],
+    "ambiguous": [
+      { "question": "How does it work?", "topSource": "", "score": null, "correctDocument": null, "answer": "", "grounded": null, "fallbackExpected": true }
+    ],
+    "short": [
+      { "question": "Price?", "topSource": "", "score": null, "correctDocument": null, "answer": "", "grounded": null, "fallbackExpected": false }
+    ],
+    "long": [
+      { "question": "", "topSource": "", "score": null, "correctDocument": null, "answer": "", "grounded": null, "fallbackExpected": false }
+    ]
+  }
+}

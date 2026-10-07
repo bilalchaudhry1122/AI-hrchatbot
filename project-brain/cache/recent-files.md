@@ -1,0 +1,1 @@
+- (ops) bot start via `python -u -m app.main`

@@ -1,0 +1,185 @@
+- 2026-10-07: Fixed onboarding welcome (resolve/persist `#announcements`) and photo step (defer before download/save).
+- 2026-10-07: Ticket greeting no longer lists employees; asking who is in BI/CS/Marketing/HR posts that department roster with photos.
+- 2026-10-07: Reverted local commit `63963b2` (mixed reset); remote `current-flow` already deleted.
+- 2026-10-07: Force-updated `AI-hrchatbot` `main` to secret-free snapshot `9d07e8e` (no extra branches).
+- 2026-10-07: Committed current-flow changes and pushed snapshot to `AI-hrchatbot` branch `current-flow` (no secrets; `main` not force-updated).
+- 2026-10-07: Started local Discord bot (`python -u -m app.main`).
+- 2026-10-06: Rewrote `docs/user-guide-hr.md` for designation, photo, HR-assigned HOD, first-ticket directory, named leave balance, birthday cake reminder.
+- 2026-10-06: First ticket posts a team directory (name, department, designation, photo).
+- 2026-10-06: Onboarding optional profile photo stored on disk; MySQL keeps Photo Path.
+- 2026-10-06: Leave-balance embed shows the employee name once (title only).
+- 2026-10-06: Day-before birthday cake reminder in HR #leave-requests (address + contact).
+- 2026-10-06: Onboarding collects a typed designation instead of Member/HOD; HOD is HR/Admin-assigned.
+- 2026-10-06: Completing #onboarding posts a welcome in public #announcements.
+- 2026-10-05: Added full technical documentation `docs/technical-documentation.md`.
+- 2026-10-05: Added SOW update guide `docs/sow-updates-current-flow.md` (onboarding/change, HOD notify-only, full channel map).
+- 2026-09-24: Added plain-English user guides: `docs/user-guide-members-hod.md` and `docs/user-guide-hr.md`.
+- 2026-09-24: Removed Unpaid Leave from leave dropdown, MySQL `leave_types`/seed, and NLP prompts. Annual/Sick/Casual only.
+- 2026-09-23: Onboarding + HR profile edit use 3+3 fields (name/contact/CNIC then email/DOB/address).
+- 2026-09-23: CS Member and Sales Member cannot apply for leave or see leave balance; no leave quota on onboard; script wipes their leave rows.
+- 2026-09-23: Onboarding keeps filled answers on validation/submit errors (Edit & try again with draft).
+- 2026-09-23: Birthday wishes schedule restored to **11:00 AM Pakistan time**.
+- 2026-09-23: Birthday greeting embed is longer and more joyful.
+- 2026-09-23: Policy answers synthesize matching handbook points intelligently (still grounded; language follows question).
+- 2026-09-23: Policy answers follow question language (English / Roman Urdu / Urdu); terms and numbers stay exact.
+- 2026-09-23: `/deleteprofile` in `#hr-profiles` — wipe employee + leave rows in MySQL, then kick from Discord.
+- 2026-09-23: Removed Airtable (pyairtable, client, scripts, env). MySQL-only; domain code in `app/records/`.
+- 2026-09-23: DATABASE_URL → Workbench `hr`; dropped Attendance; migrated Airtable (145 rows).
+- 2026-09-23: Airtable→MySQL path added (SqlClient drop-in, setup + migrate scripts, DB_BACKEND switch).
+- 2026-09-22: Policy answers include main handbook points (3–6 sentences). "in detail" re-retrieves the prior topic instead of rewriting a thin summary.
+- 2026-09-22: Policy answers extract only the relevant part of the reference chunk instead of the whole section (prompt-only, no ingestion change).
+- 2026-09-22: Open ticket panel posts at the start of `on_ready` so `#open-ticket` is not empty.
+- 2026-09-22: Restarted HR Assistant.
+- 2026-09-22: Airtable resynced to new Discord roles (Admin/Staff removed). HR Role HR for Bilal. Khadija and Ibtihaj Inactive.
+- 2026-09-22: Leave mail To reloaded from `LEAVE_MAIL_HR` (`muhammad.bilal@webairy.com`).
+- 2026-09-22: Recreated `#leave-requests` in the HR category (Admin/HR only) after it was deleted.
+- 2026-09-22: Shareable leave-mail HTML is in `share/webairy-leave-mail-template.html`.
+- 2026-09-22: Leave-mail footer no longer has Facebook/LinkedIn/WhatsApp/Live Chat or Client Area links.
+- 2026-09-22: Leave-mail purple header and footer have rounded corners.
+- 2026-09-22: Leave-mail header/footer use solid purple `bgcolor` so Outlook light mode shows the logo and brand colour.
+- 2026-09-22: Approved and cancelled leave mail uses the WebAiry logo header and social footer.
+- 2026-09-22: Attendance policy is handbook search, not Airtable. Greeting no longer offers attendance. Leave apply opens the form only.
+- 2026-09-22: “What are the policies” lists topic names; looped Gemma output (wall of o) is dropped.
+- 2026-09-22: Restarted the Discord bot again after the company-policy retrieve fix.
+- 2026-09-22: “Company policy / policies” retrieves the handbook instead of the greeting fallback.
+- 2026-09-22: Restarted the Discord bot so `LEAVE_MAIL_HR` is live.
+- 2026-09-22: Leave approved/cancel To is `LEAVE_MAIL_HR` (`syed.mohib@webairy.com`). HOD Cc stays Airtable.
+- 2026-09-22: Employees cleaned to live Discord roles. Khadija is Member (not HR). Shahzaib and Faizan are Inactive. HODs: Shahzad BI, Bilal CS. No HR Role HR row.
+- 2026-09-21: Leave-mail To is only Airtable **HR Role** HR/Admin. A Discord HR role on a member (and the employee’s own Email) is not added to To.
+- 2026-09-21: Approved and cancelled leave mail To/Cc are the live Email fields on Employees (HR and HOD). `LEAVE_MAIL_*` was removed from `.env`.
+- 2026-09-21: New tickets ping the member only (privacy stays on the greeting card). “Can I tell my salary?” is answered from confidentiality policy. Sick apply phrases fill Reason as “I am ill” / “I am sick”.
+- 2026-09-21: Cancel form Submit is labelled Submit; no form if there is no upcoming approved leave. Apply posts the policy line and the leave form together. Leave cards hide ticket/user ids and show the approver’s Discord handle.
+- 2026-09-21: Bilal Chaudhry is HR in Airtable (`muhammad.bilal@webairy.com`). HOD mail: BI Shahzad, CS IBT!HAJ, Marketing Bilal (still Marketing HOD on Discord).
+- 2026-09-21: Approved and cancelled leave mail is sent even when `LEAVE_MAIL_HR` is empty (SMTP login + employee Email). From matches the SMTP login.
+- 2026-09-21: Bot answers in tickets are new messages, not Discord replies. Pending leave cards are edited in place so a replaced card cannot show “Message could not be loaded.”
+- 2026-09-21: `/granted` and `/rejected` are removed. Approve and Reject on the leave-channel card is the only decision path.
+- 2026-09-21: A new ticket posts only the greeting embed (no Member info card).
+- 2026-09-21: Cancel-leave mail Ccs the department HOD even if the cancelled row no longer has HOD-approval fields.
+- 2026-09-21: Cancelling approved leave emails HR (Cc the HOD who approved it) with the cancellation details, after the Airtable row is cancelled.
+- 2026-09-21: Cancel-leave form lists approved leaves to choose from; it no longer asks anyone to copy dates.
+- 2026-09-21: Approved leave is cancelled from a ticket form (list dates, reason, submit). `/cancelleave` is gone.
+- 2026-09-21: Discord bot name is **HR Assistant** (username, nickname, and who-are-you replies).
+- 2026-09-17: Leave inboxes use separate Discord categories: **HR** (`#leave-requests`) and **HOD** (`#bi-hod` / `#cs-hod` / `#marketing-hod`).
+- 2026-09-17: Leave form Reason is auto-filled from the chat prompt when the person states why they need leave.
+- 2026-09-17: Leave form attachments stay on the form preview; the bot no longer re-posts those files in the ticket chat.
+- 2026-09-17: After HR lost Discord Administrator, HOD channel hides are reapplied on bot start and when a role’s permissions change.
+- 2026-09-17: HOD leave channels deny the HR role even when `adminRoleId` is HR. Only that department’s HOD (and a separately named Admin role) can see them.
+- 2026-09-17: New Discord roles and any member role change are written to Airtable (Discord Roles catalog + employee Discord Roles). Member-named roles onboard even without Staff.
+- 2026-09-17: BI HOD Email in Airtable is `shahzad@webairy.com` to match `LEAVE_MAIL_HOD_BI` for approved-leave Cc.
+- 2026-09-16: Approved-leave Cc uses `LEAVE_MAIL_HOD_*` from `.env` (BI = syed.mohib@webairy.com). Those addresses were written onto HOD/HR Email in Airtable.
+- 2026-09-16: Approved-leave mail now Ccs the department HOD whenever the request went through a HOD inbox, and keeps the HOD name after HR approves.
+- 2026-09-16: Leave mail is sent only after HOD and HR approve. To: HR. Cc: the HOD who approved. Discord inboxes still post as before.
+- 2026-09-16: BI HOD leave mail uses `LEAVE_MAIL_HOD_BI=syed.mohib@webairy.com` (env still overrides Airtable).
+- 2026-09-16: Leave emails and HOD/HR Discord cards show Casual/Annual/Sick names, the employee’s name, and reason file names — not Airtable rec ids or Discord URLs.
+- 2026-09-16: `LEAVE_MAIL_HOD_*` / `LEAVE_MAIL_HR` override Airtable when set, so the BI HOD address in `.env` is the one used.
+- 2026-09-16: HOD/HR leave mail still sends when the applicant’s Email is the same catch mailbox as the inbox.
+- 2026-09-16: Only the matching HOD is notified for their channel; HR is notified only for #leave-requests.
+- 2026-09-16: Leave requests email BI HOD, CS HOD, Marketing HOD, and HR when SMTP and reviewer emails are set.
+- 2026-09-16: HODs cannot see other people’s tickets. They only approve leave in their HOD inbox and can open their own ticket (leave still goes to HR).
+- 2026-09-16: Discord roles are stored in Airtable. A new or renamed server role syncs immediately; assigning a workplace role still updates the employee.
+- 2026-09-16: BI/CS/Marketing Member leave posts to that HOD inbox even if Airtable or another role still says Sales.
+- 2026-09-16: Leave “Approved by” / “Rejected by” in the ticket shows Admin, HR, or department HOD — not the display name.
+- 2026-09-16: Member leave posts to the department HOD channel. Airtable Status now includes PENDING_MANAGER/PENDING_HR; inbox routing uses needsHod if Status had fallen back to PENDING.
+- 2026-09-16: Joining the server and receiving a Member, HOD, or Admin role creates the Airtable employee and leave quota automatically (including a delayed re-check after join).
+
+
+
+
+
+- 2026-09-15: Leave and decline reasons can include optional image/file attachments (up to 5).
+- 2026-09-15: `#leave-requests` keeps Approve and Reject on the card; the click is acknowledged immediately so Discord does not drop the buttons.
+- 2026-09-15: Approve on `#leave-requests` acknowledges Discord first so Airtable lookup no longer times out the button.
+- 2026-09-15: Closing a ticket shows the closer’s name and role, and no longer posts a “thinking…” placeholder.
+- 2026-09-15: “Who are you?” presents WebAiry HR assistant. Leave, tickets, and policy answers are unchanged.
+- 2026-09-15: Created `#leave-requests` on Discord via MCP and stored its ID in `channels.json`. Visibility lock and Approve/Reject still come from the HR bot.
+- 2026-09-15: Submitted leave is posted in a private `#leave-requests` channel (Admin and HR only) with Approve and Reject. Staff tickets still only have Withdraw.
+- 2026-09-15: A policy question after apply no longer withdraws pending leave. Withdraw still works if they type withdraw.
+- 2026-09-14: After approve or reject, the staff member is DMed. If DMs are closed they are mentioned in the ticket.
+- 2026-09-14: `/leave`, `/granted`, and `/rejected` are Admin or HR only. Staff cannot mute the bot or decide leave.
+- 2026-09-14: Only Admin can approve or decline leave. Staff pending cards have Withdraw only; `/granted` and `/rejected` refuse non-admins.
+- 2026-09-14: Long combined answers are split into Discord messages of 2000 characters so a multi-question reply no longer 400s.
+- 2026-09-14: A pasted list of HR questions is answered one by one; the leave-apply line still opens the form. OPD/freelance/appraisal stay in scope.
+- 2026-09-14: Leave draft card no longer shows the “From aur To bharain…” instruction line.
+- 2026-09-14: Welcome ticket greeting no longer lists “Was I marked late yesterday?” as an example.
+- 2026-09-14: Freelance / personal PC / company laptop / warning-letter questions stay on policy RAG. They no longer open a leave form because “stays off” was treated as time off.
+- 2026-09-11: Withdraw works on the current Leave Requests table (no Rejection Reason / Cancelled At). Those columns are skipped; Status still becomes CANCELLED.
+- 2026-09-11: “What the leave policy” stays on the handbook. Personal remaining days are only used for “how many leaves are allowed” when the handbook has no numbers.
+- 2026-09-11: Leave submit no longer dies when Status is still the old PENDING/APPROVED/REJECTED select; it writes PENDING and logs the Airtable body.
+- 2026-09-10: Bare `nhi`/`no`/`yes`/`haan` only cancel or submit when the form is waiting for confirm; otherwise they are just an ack.
+- 2026-09-10: Reverted leave-form month calendar; Fill form is From / To / Reason again.
+- 2026-09-10: Confirm/cancel only from the whole sentence; leading yes/ok/haan/no/nahi no longer hijack a longer message.
+- 2026-09-10: “nhi mujhe withdraw nahi karna” / “don’t withdraw” keeps PENDING; only explicit withdraw cancels.
+- 2026-09-10: “meray pass kitni leaves hain?” and English “my leave balance” hit Airtable; “leave policy btao” stays handbook.
+- 2026-09-10: Ticket session memory (`sessions.json`); “give me again” / “in precise form” reuse the last grounded answer.
+- 2026-09-10: WebAiry intent pack: CLARIFY, conservative writes, holiday vs apply; live attendance and leave form kept.
+- 2026-09-10: Leave entitlements are 16 annual, 8 sick, 8 casual, defined once and overridable by env. The bulk script imports them instead of holding a second copy.
+- 2026-09-10: Assigning Staff or HR in Discord creates or updates the Airtable employee and their balances; removing HR clears the HR Role field. Same row every time.
+- 2026-09-10: New startup backfill adds anyone who already held a role before the bot existed - the join and role-change events never fire for them.
+- 2026-09-10: Department now follows the role (Staff or HR) rather than collapsing everyone to Staff.
+- 2026-09-10: Windows cp1252 consoles crashed on a non-ASCII startup warning; stdout/stderr now force UTF-8 (app/console.py).
+- 2026-09-10: The bot never says it could not find something, and never mentions a handbook, documents, records, a knowledge base, Pinecone or Airtable. With nothing to answer with it states what it handles and invites an HR question.
+- 2026-09-10: Answers no longer print a Source: filename line; sources stay in the logs only.
+- 2026-09-10: Prompts pass the retrieved text as “reference text” and forbid the model from mentioning documents or searching.
+- 2026-09-10: “Airtable par leave balance nahi mila” replaced — a missing balance is now a setup matter for HR, with no system named.
+- 2026-09-10: New sweep test walks every employee-facing string in all four language modes and fails on any word that reveals the retrieval layer.
+- 2026-09-10: A decline reason is optional again; when given it still goes to Rejection Reason.
+- 2026-09-10: HR-only scope guard runs before retrieval — maths, trivia, coding, news, entertainment get a professional redirect and never reach Pinecone.
+- 2026-09-10: Workplace vocabulary always wins, so “calculate my remaining leave” is never redirected.
+- 2026-09-10: An HR question the handbook cannot answer now says so and offers HR, instead of implying the employee was off-topic.
+- 2026-09-10: Employee journey rewritten in app/discord/journey.py: entry card, welcome with examples, /help, closing card.
+- 2026-09-10: Prompts and social replies made HR-branded and professional across English, Urdu and Roman Urdu.
+- 2026-09-09: Weekends and Holidays no longer cost leave. Fri-Mon is 2 days; an all-weekend booking is refused.
+- 2026-09-09: Two-step approval — manager then HR — with Admin above both. Manager approval does not move the balance.
+- 2026-09-09: Declining leave requires a reason, stored in Rejection Reason so the employee's own reason survives.
+- 2026-09-09: Approve / Decline buttons on the pending card; Decline opens a reason modal.
+- 2026-09-09: Every decision is also sent to the employee as a DM.
+- 2026-09-09: `/pending` shows what is waiting for you, `/myleave` your own calendar, `/cancelleave` returns the days.
+- 2026-09-09: Half-day leave (0.5) for single-day bookings, set in the Fill form modal.
+- 2026-09-09: Half-filled leave forms survive a restart (`leave_drafts.json`).
+- 2026-09-09: Buttons no longer fire twice — removed the `on_interaction` listener that duplicated discord.py's own view/tree dispatch.
+- 2026-09-09: Close ticket button posts with a callback-bearing view instead of a bare row, so it works without that listener.
+- 2026-09-09: `tickets.json` writes are atomic (temp file + swap); a damaged file is quarantined instead of blocking startup.
+- 2026-09-09: Airtable reads/writes retry on 429 and 5xx; leave requests are filtered by Discord User ID; leave types cached 5 min.
+- 2026-09-09: “kal” means yesterday in an attendance question; explicit past dates resolve to the past for lookups, future for leave.
+- 2026-09-09: Short replies like “yes” keep the language the member was already using.
+- 2026-09-09: Added `tests/test_reliability.py` — ticket storage, Airtable retries, date rules, and Discord wiring.
+- 2026-09-09: Ticket chat: policy follow-ups, handbook retrieve retry, MIXED only when they also ask “do I have”.
+- 2026-09-09: “How many leaves are allowed in total” retrieves handbook policy, not the out-of-scope line.
+- 2026-09-09: Close ticket button posts only at ticket open; Staff/Admin/owner close with `/close`.
+- 2026-09-09: `SOW.md` Annex A has Mermaid architecture/flows; Annex B is a copy-paste prompt for an agent to draw D1/D2.
+- 2026-09-09: Stray “yes” after a leave-balance card is an ack, not another balance dump or fake apply.
+- 2026-09-09: Added `SOW.md` — Statement of Work draft for the chatbot project (management document).
+- 2026-09-09: “No I mean how many leaves are allowed” is company policy, not leave cancel. Personal remaining stays Airtable.
+- 2026-09-09: Submit is blocked when From–To overlap already approved leave; the form stays open to change dates.
+- 2026-09-09: Close ticket follows the last message in the ticket chat.
+- 2026-09-09: Open-ticket panel has Open only; clicking it while a ticket exists shows an ephemeral “already open” notice.
+- 2026-09-09: Only one leave form in the ticket; a new “i want leave” reuses that card.
+- 2026-09-09: Withdraw cancels every leftover PENDING leave for that staff member, not only the latest card.
+- 2026-09-09: Pending leave stays visible in the ticket; staff can Withdraw anytime (Airtable CANCELLED).
+- 2026-09-09: “kesay ho?” is a greeting; off-topic replies no longer mention weather unless asked.
+- 2026-09-09: Staff cannot submit a second leave request while one is still PENDING.
+- 2026-09-09: Leave form no longer reappears after a leave flow when the user asks something else in the ticket.
+- 2026-09-09: Off-topic questions (weather, general AI, trivia) are refused; bot stays on policy, leave, attendance, tickets.
+- 2026-09-09: Leave/balance messages hide record and request IDs; copy is “your live leave balance”.
+- 2026-09-09: Leave form/confirm/pending cards aligned as production HR embeds (status, dates, no record IDs).
+- 2026-09-09: Fill form From/To show date format `DD Mon YYYY`.
+- 2026-09-09: Fill form has separate From, To, and Reason fields.
+- 2026-09-09: Fill form dates use `From - To` (`DD Mon YYYY - DD Mon YYYY`).
+- 2026-09-09: Fill form dates use `From | To` (`DD Mon YYYY | DD Mon YYYY`); Discord cannot layout two modal inputs side by side.
+- 2026-09-09: Leave apply is a form card (type / from / to / reason) plus Fill form modal; no example prompts.
+- 2026-09-09: Leave confirm uses Submit/Cancel buttons; `say`/`tak` date ranges parse correctly.
+- 2026-09-09: Smarter ticket chat — follow-ups, last 10 turns, name-aware replies; leave form does not reopen on small talk.
+- 2026-09-09: “Nahi chahiye leave” / “I don’t want leave” cancel apply; after cancel, chat stays open.
+- 2026-09-09: Unrelated questions get a normal chat reply; policy/leave numbers are still not invented.
+- 2026-09-09: Staff/Admin role assignment upserts the member into Airtable Employees + leave balances.
+- 2026-09-09: Reply language locked: English, Roman Urdu, Urdu script, or mix.
+- 2026-09-09: Airtable leave cleaned — Available of Total; Leave Utilization (date + weekday); Used synced to unique days.
+- 2026-09-09: Ticket context trimmed (12 for routing, 6 for LLM); live leave does not dump chat.
+- 2026-09-08: Bot answers “what is this server/channel knowledge / my name” from Discord identity, not RAG.
+- 2026-09-08: Personal leave uses Airtable; policy uses Pinecone. Staff cannot see or get notified on other tickets.
+- 2026-09-08: “Apni leave / tell me about my leave” uses live Airtable balance; handbook only for policy.
+- 2026-09-08: Leave apply parses natural dates (10 Sep) and only asks for missing type/days/range; follow-ups stay in the ticket draft.
+- 2026-09-08: Leave apply now asks type, then Annual from–to or other types date/day-count, then confirm.
+- 2026-09-08: Added Airtable HR layer, agent intent routing, /whoami /granted /rejected; kept Pinecone tickets.
+- 2026-09-08: Fixed circular import (generation ↔ embeddings) that crashed bot startup.
+- 2026-09-08: Project Brain initialized. Cursor always-apply rule added so every prompt follows Stages 1–9.

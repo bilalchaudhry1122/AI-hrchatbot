@@ -1,0 +1,46 @@
+{
+  "namespace": "web airy",
+  "expectedSource": "WebAiry Rules Policies.docx",
+  "threshold": 0.62,
+  "notes": "Keep policy headings clear in Drive (example: 8.5 Investigation principles). n8n will re-index after you edit the doc.",
+  "groups": {
+    "known": [
+      "What are the investigation principles?",
+      "What is the purpose of the HR handbook?",
+      "What is fair process?",
+      "What conduct is prohibited?",
+      "What is WebAiry's equal opportunity policy?"
+    ],
+    "paraphrased": [
+      "How should an investigation be carried out?",
+      "Why does WebAiry have an HR handbook?",
+      "How should a manager handle a concern fairly?",
+      "What are employees not allowed to do?",
+      "Does WebAiry treat employees equally?"
+    ],
+    "partial": [
+      "What training do employees have to complete?",
+      "Who approves policy updates?",
+      "How should safety concerns be raised?"
+    ],
+    "unrelated": [
+      "What is the capital of France?",
+      "How do I bake sourdough bread?",
+      "What is the weather in London?"
+    ],
+    "ambiguous": [
+      "How does it work?",
+      "What about that?",
+      "Can you help?"
+    ],
+    "short": [
+      "Price?",
+      "Refunds?",
+      "Leave?"
+    ],
+    "long": [
+      "If a manager receives a complaint about workplace conduct, what investigation principles should they follow and how should they treat the people involved?",
+      "Can you explain the purpose of the WebAiry HR handbook and how employees and managers are supposed to use it day to day?"
+    ]
+  }
+}

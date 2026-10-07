@@ -1,0 +1,29 @@
+{
+  "respondMode": "slash",
+  "tickets": {
+    "enabled": true,
+    "categoryId": "1546473646170832946",
+    "adminRoleId": "1546459033421217862",
+    "staffRoleId": "1546438001696055336",
+    "leaveReviewChannelId": "1551913634563752038",
+    "leaveCategoryId": "1550128548117745766",
+    "hodChannels": {
+      "BI": "1549654614775955567",
+      "CS": "1549654612791795773",
+      "Marketing": "1549654609914503200"
+    },
+    "hodRoleIds": {
+      "BI": "1549658741819973692",
+      "CS": "1549658469248798760",
+      "Marketing": "1549658569027362898"
+    },
+    "hrCategoryId": "1550128548117745766",
+    "onboardingChannelId": "1552226123293655140",
+    "announcementChannelId": "1552226139702038629",
+    "hrProfileChannelId": "1552226136514109454",
+    "hrAnnouncementChannelId": "1552307769338626088"
+  },
+  "channels": {
+    "1544669716793008140": "web airy"
+  }
+}
